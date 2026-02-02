@@ -34,3 +34,7 @@ Install the package with unity's package manager
 3. Select **Add package from Git URL**.
 4. Enter `https://github.com/Querke/better-terrain-tools.git`
 5. Select **Add**.
+
+## Thanks to
+
+http://terrainformer.com/ for inspiring me to create better terrain tools and the idea for height cache to preserve detail and extend and carve with the flatten tool.
