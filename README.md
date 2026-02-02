@@ -14,6 +14,11 @@
   * **Flatten:** Standard flattening
 * **Smudge** Pulls terrain height along the mouse path, allowing you to "drag" slopes or smear textures organically.
 
+## How to use
+<img width="265" height="303" alt="image" src="https://github.com/user-attachments/assets/6aa639f5-308a-4f8b-9d1e-e8f46b982ea7" />
+
+Click the custom brushes mode in Unity's terrain scene toolbar. Or select the tool from the tool dropdown in the inspector.
+
 ## Hotkeys
 
 * **Shift + Scroll:** Resize Brush.
