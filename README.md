@@ -27,5 +27,5 @@ Install the package with unity's package manager
 1. Open the Package Manager via `Window/Package Manager`.
 2. Select the + from the top left of the window.
 3. Select **Add package from Git URL**.
-4. Enter [`https://github.com/Querke/better-terrain-tools.git`.](https://github.com/Querke/better-terrain-tools.git.)
+4. Enter `https://github.com/Querke/better-terrain-tools.git`
 5. Select **Add**.
