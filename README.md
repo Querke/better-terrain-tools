@@ -1,5 +1,18 @@
 # Better Terrain Tools for Unity
 
+https://github.com/user-attachments/assets/049b7dbd-48b2-4796-aa80-75062af5f6dc
+
+
+
+https://github.com/user-attachments/assets/d2950dca-392f-46ea-bd2e-caf101dd98f8
+
+
+
+https://github.com/user-attachments/assets/ef9f3b86-da25-4f4b-a039-134ac40d8b60
+
+
+
+
 **Better Terrain Tools** is a collection of high-precision sculpting tools for the Unity Terrain System. 
 
 It has a procedural brush, which makes it easy to have fine control over the brush tip (hard/soft) wihtout having to deal with the hassle of creating importing brush textures. 
@@ -27,9 +40,9 @@ Click the custom brushes mode in Unity's terrain scene toolbar. Or select the to
 
 ## Hotkeys
 
-* **Shift + Scroll:** Resize Brush.
+* **Alt + Scroll:** Resize Brush.
 * **Ctrl + Scroll:** Adjust Strength/Opacity.
-* **Alt + Scroll:** Adjust Brush Tip (Roundness/Falloff).
+* **Shift + Scroll:** Adjust Brush falloff (soft/hard).
 
 ## Installation
 
