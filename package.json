@@ -5,6 +5,6 @@
   "description": "High precision terrain tools",
   "unity": "6000.0",
   "dependencies": {
-    "com.unity.terrain-tools": "5.2.1"
+    "com.unity.terrain-tools": "5.3.1"
   }
 }
