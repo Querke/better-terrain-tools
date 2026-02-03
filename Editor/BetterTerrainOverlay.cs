@@ -35,7 +35,7 @@ namespace BetterTerrainTools
 					BetterTerrainToolOverlayGui tool = ActiveTool;
 					if (tool == null)
 					{
-						EditorGUILayout.HelpBox("No active TerrainFormer tool.", MessageType.Info);
+						EditorGUILayout.HelpBox("No active Better Terrain tool. Select a terrain and select a custom tool.", MessageType.Info);
 						return;
 					}
 

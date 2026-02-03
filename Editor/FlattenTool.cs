@@ -35,10 +35,21 @@ namespace BetterTerrainTools
 
 		public override bool OnPaint(Terrain terrain, IOnPaint editContext)
 		{
+			// 1. Get the UV position first
+			Vector2 uv = GetBrushUV();
+
+			// Safety Check: If mouse is off terrain, stop immediately
+			if (uv.x < 0 || uv.y < 0)
+				return false;
+
+			// 2. Capture Target Height from DATA, not PHYSICS
 			if (Event.current.type == EventType.MouseDown)
 			{
-				float h = (editContext.raycastHit.point.y - terrain.GetPosition().y) / terrain.terrainData.size.y;
-				_targetHeight = h;
+				// accurateHeight is in World Units (meters)
+				float accurateHeight = terrain.terrainData.GetInterpolatedHeight(uv.x, uv.y);
+
+				// Normalize to 0-1
+				_targetHeight = accurateHeight / terrain.terrainData.size.y;
 			}
 
 			Undo.RegisterCompleteObjectUndo(terrain.terrainData, "Terrain Flatten");
@@ -56,7 +67,6 @@ namespace BetterTerrainTools
 
 			float[,] brushMask = GenerateBrushMask(brushPixelsSize, true);
 
-			Vector2 uv = editContext.uv;
 			int centerX = Mathf.FloorToInt(uv.x * heightMapRes);
 			int centerY = Mathf.FloorToInt(uv.y * heightMapRes);
 

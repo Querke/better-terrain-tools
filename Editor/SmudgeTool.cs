@@ -23,14 +23,14 @@ namespace BetterTerrainTools
 			// Reset stroke if mouse just went down or we are far from last point (teleport/new click)
 			if (Event.current.type == EventType.MouseDown || !_hasStartedStroke)
 			{
-				_lastUv = editContext.uv;
+				_lastUv = GetBrushUV();
 				_hasStartedStroke = true;
 				// On first frame of click, we can't smudge yet as we have no delta
 				return true;
 			}
 
 			// Calculate how much the mouse moved in UV space
-			Vector2 currentUv = editContext.uv;
+			Vector2 currentUv = GetBrushUV();
 			Vector2 uvDelta = currentUv - _lastUv;
 
 			// If we haven't moved enough to calculate a smudge direction, skip

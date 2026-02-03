@@ -83,10 +83,11 @@
 					_startHeights = (float[,]) cachedHeights.Clone();
 			}
 
-			Vector2 uv = editContext.uv;
+			Vector2 uv = GetBrushUV();
 			float terrainHeight = terrain.terrainData.size.y;
 			float centerHeightNorm = terrain.terrainData.GetInterpolatedHeight(uv.x, uv.y) / terrainHeight;
 
+			// Conversion from World Meters to 0-1 Space
 			float rangeNorm = Mathf.Max(0.00001f, _wallBlendRange / terrainHeight);
 			float clampNorm = _additiveClamp / terrainHeight;
 
@@ -129,13 +130,37 @@
 					{
 						float influenceFactor = 1f;
 
-						// 1. Context Aware Influence
 						if (_fillMode)
 						{
+							// Difference between Pixel and Brush Center
+							// Positive = Pixel is higher (Up a wall/hill)
+							// Negative = Pixel is lower (In a hole/valley)
 							float diff = heightVal - centerHeightNorm;
-							influenceFactor = isLowering
-								? 1.0f - Mathf.Clamp01((-diff) / rangeNorm)
-								: 1.0f - Mathf.Clamp01(diff / rangeNorm);
+
+							// Calculate ratio based on user's Blend Range setting
+							float ratio = diff / rangeNorm;
+
+							if (isLowering)
+							{
+								// LOWERING: Dig freely if we are above the center (walls), 
+								// but fade out if we try to dig below the center (the floor).
+								if (diff > 0)
+									influenceFactor = 1f;
+								else
+									influenceFactor = Mathf.Exp(-ratio * ratio);
+							}
+							else
+							{
+								// RAISING (Sand Mode):
+								// If pixel is BELOW center (Hole): Fill with 100% strength.
+								// If pixel is ABOVE center (Hill/Wall): Fade out exponentially.
+								// This avoids the "Plateau" because it never hits a hard 0 limit.
+
+								if (diff < 0)
+									influenceFactor = 1f;
+								else
+									influenceFactor = Mathf.Exp(-ratio * ratio);
+							}
 						}
 
 						// 2. Apply Change
@@ -153,7 +178,7 @@
 						else
 						{
 							// Standard Logic
-							float sample = (maskValue * influenceFactor) / (terrain.terrainData.heightmapScale.y / 10);
+							float sample = (maskValue * influenceFactor) / (terrain.terrainData.heightmapScale.y);
 							heightVal = isLowering ? Mathf.Max(0f, heightVal - sample) : Mathf.Min(1f, heightVal + sample);
 						}
 					}
