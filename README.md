@@ -2,9 +2,11 @@
 
 **Better Terrain Tools** is a collection of high-precision sculpting tools for the Unity Terrain System. 
 
-It has a procedural brush, which makes it easy to have fine control over the brush tip (pointy/wide, hard/soft) wihtout having to deal with the hassle of creating importing brush textures. 
+It has a procedural brush, which makes it easy to have fine control over the brush tip (hard/soft) wihtout having to deal with the hassle of creating importing brush textures. 
 
 Unlike standard Unity tools, this suite uses a floating-point height cache to prevent the "stepping" or "staircase" artifacts, providing much smoother results and sculpting logic that gives you more control and is more intuitive to use.
+
+It also raycasts directly onto unity's heightmap, because Unity has a bug where it doesn't update the terrain collider correctly.
 
 ## Included Tools
 
