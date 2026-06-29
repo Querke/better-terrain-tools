@@ -15,19 +15,18 @@
 
 		[SerializeField] protected int _mode;
 
-		[SerializeField] private bool _fillMode;
-
 		[SerializeField] private float _additiveClamp;
+
+		[SerializeField] private float _fillStrength = 5f;
 
 		[SerializeField] private bool _enableSmoothing;
 
 		private float[,] _startHeights;
 
-		private float _wallBlendRange = 3;
 		private const float SMOOTH_STRENGTH = 4f;
 		private const float STRUCTURE_PERSISTENCE = 1f; // Lower = preserves structure more
 
-		private string[] _modes = {"Additive", "Set"};
+		private string[] _modes = {"Additive", "Set", "Fill"};
 		private string[] _fillModes = {"Off", "On"};
 
 		protected override void OnSubToolGui()
@@ -41,14 +40,9 @@
 				_additiveClamp = EditorGUILayout.Slider("Relative clamp (m)", _additiveClamp, 0.01f, 50f);
 			}
 
-			EditorGUILayout.BeginHorizontal();
-			GUILayout.Label("Fill", GUILayout.Width(EditorGUIUtility.labelWidth));
-			_fillMode = GUILayout.Toolbar((_fillMode ? 1 : 0), _fillModes) == 1;
-
-			EditorGUILayout.EndHorizontal();
-			if (_fillMode)
+			if (_mode == 2)
 			{
-				_wallBlendRange = EditorGUILayout.Slider("Wall blend range (m)", _wallBlendRange, 1f, 5f);
+				_fillStrength = EditorGUILayout.Slider("Fill strength (m)", _fillStrength, 0.05f, 20f);
 			}
 
 			EditorGUILayout.BeginHorizontal();
@@ -85,10 +79,8 @@
 
 			Vector2 uv = GetBrushUV();
 			float terrainHeight = terrain.terrainData.size.y;
-			float centerHeightNorm = terrain.terrainData.GetInterpolatedHeight(uv.x, uv.y) / terrainHeight;
 
 			// Conversion from World Meters to 0-1 Space
-			float rangeNorm = Mathf.Max(0.00001f, _wallBlendRange / terrainHeight);
 			float clampNorm = _additiveClamp / terrainHeight;
 
 			float brushSizeWorld = _brushSize;
@@ -114,6 +106,25 @@
 			if (width <= 0 || height <= 0)
 				return false;
 
+			float highestBrushHeightNorm = 0f;
+			float lowestBrushHeightNorm = 1f;
+			for (int x = 0; x < width; x++)
+			{
+				for (int y = 0; y < height; y++)
+				{
+					int globalX = xStart + x;
+					int globalY = yStart + y;
+					float maskValue = brushMask[globalX - xBase, globalY - yBase];
+
+					if (maskValue > 0.0000001f)
+					{
+						highestBrushHeightNorm = Mathf.Max(highestBrushHeightNorm, cachedHeights[globalY, globalX]);
+						lowestBrushHeightNorm = Mathf.Min(lowestBrushHeightNorm, cachedHeights[globalY, globalX]);
+					}
+				}
+			}
+			float heightRangeNorm = Mathf.Max(0.00001f, highestBrushHeightNorm - lowestBrushHeightNorm);
+
 			float[,] patchHeights = new float[height, width];
 			bool isLowering = Event.current.control;
 
@@ -128,57 +139,42 @@
 
 					if (maskValue > 0.0000001f)
 					{
-						float influenceFactor = 1f;
-
-						if (_fillMode)
+						if (_mode == 2) // FILL MODE
 						{
-							// Difference between Pixel and Brush Center
-							// Positive = Pixel is higher (Up a wall/hill)
-							// Negative = Pixel is lower (In a hole/valley)
-							float diff = heightVal - centerHeightNorm;
-
-							// Calculate ratio based on user's Blend Range setting
-							float ratio = diff / rangeNorm;
+							// Step expressed in real world meters, converted to 0-1 space so it
+							// stays consistent regardless of how tall the terrain is.
+							float fillStepNorm = _fillStrength / terrainHeight;
 
 							if (isLowering)
 							{
-								// LOWERING: Dig freely if we are above the center (walls), 
-								// but fade out if we try to dig below the center (the floor).
-								if (diff > 0)
-									influenceFactor = 1f;
-								else
-									influenceFactor = Mathf.Exp(-ratio * ratio);
+								// Sand drains toward the lowest point in the brush; pixels near
+								// the top erode fastest (squared falloff), settling flat.
+								float lowerRatio = (heightVal - lowestBrushHeightNorm) / heightRangeNorm;
+								float step = maskValue * lowerRatio * lowerRatio * fillStepNorm;
+								heightVal = Mathf.Max(lowestBrushHeightNorm, heightVal - step);
 							}
 							else
 							{
-								// RAISING (Sand Mode):
-								// If pixel is BELOW center (Hole): Fill with 100% strength.
-								// If pixel is ABOVE center (Hill/Wall): Fade out exponentially.
-								// This avoids the "Plateau" because it never hits a hard 0 limit.
-
-								if (diff < 0)
-									influenceFactor = 1f;
-								else
-									influenceFactor = Mathf.Exp(-ratio * ratio);
+								// Sand fills toward the highest point in the brush; pixels in the
+								// deepest holes fill fastest (squared falloff), settling flat.
+								float fillRatio = (highestBrushHeightNorm - heightVal) / heightRangeNorm;
+								float step = maskValue * fillRatio * fillRatio * fillStepNorm;
+								heightVal = Mathf.Min(highestBrushHeightNorm, heightVal + step);
 							}
 						}
-
-						// 2. Apply Change
-						if (_mode == 1 && _additiveClamp > 0.001f)
+						else if (_mode == 1 && _additiveClamp > 0.001f) // RELATIVE CLAMP MODE
 						{
-							// Relative Clamp Logic
 							float originalVal = _startHeights[globalY, globalX];
 							float targetHeight = isLowering
 								? Mathf.Max(0f, originalVal - clampNorm)
 								: Mathf.Min(1f, originalVal + clampNorm);
 
-							float step = maskValue * influenceFactor * _brushOpacity * 0.05f;
+							float step = maskValue * _brushOpacity * 0.05f;
 							heightVal = Mathf.MoveTowards(heightVal, targetHeight, step);
 						}
-						else
+						else // raise lower
 						{
-							// Standard Logic
-							float sample = (maskValue * influenceFactor) / (terrain.terrainData.heightmapScale.y);
+							float sample = maskValue / terrain.terrainData.heightmapScale.y * 10;
 							heightVal = isLowering ? Mathf.Max(0f, heightVal - sample) : Mathf.Min(1f, heightVal + sample);
 						}
 					}

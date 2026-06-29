@@ -16,14 +16,19 @@ namespace BetterTerrainTools
 		public override int IconIndex => 0;
 		public override bool HasToolSettings => true;
 		public override bool HasBrushAttributes => false;
+		protected virtual bool ShowGuiBrushTexture => true;
+		protected virtual bool ShowShortcutHelp => true;
 
 		// --- Settings ---
 		[SerializeField] protected float _brushSize = 50f;
-		[SerializeField] protected float _brushOpacity = 0.1f;
+		[SerializeField] protected float _brushOpacity = 0.5f;
 
 		// CHANGED: Renamed from Roundness to Falloff for clarity
 		[SerializeField, Range(0f, 1f)]
-		protected float _brushFalloff = 0.5f;
+		protected float _brushFalloff = 0.95f;
+
+		[SerializeField]
+		protected AnimationCurve _brushFalloffCurve;
 
 		// --- State ---
 		private Vector2 _customUV;
@@ -32,6 +37,7 @@ namespace BetterTerrainTools
 		private Texture2D _previewBrushTexture;
 		private Texture2D _guiBrushTexture;
 		private readonly Dictionary<Terrain, float[,]> _heightCache = new();
+		private bool _drawingOverlayGui;
 
 		public override void OnEnterToolMode()
 		{
@@ -49,7 +55,20 @@ namespace BetterTerrainTools
 			BetterTerrainOverlay.SetDisplayed(false);
 		}
 
-		public void DrawOverlayGui() => RenderGui();
+		public void DrawOverlayGui()
+		{
+			_drawingOverlayGui = true;
+			try
+			{
+				RenderGui();
+			}
+			finally
+			{
+				_drawingOverlayGui = false;
+			}
+		}
+
+		protected bool IsDrawingOverlayGui => _drawingOverlayGui;
 
 		private void OnUndoRedo()
 		{
@@ -82,11 +101,26 @@ namespace BetterTerrainTools
 
 			EditorGUILayout.LabelField("Brush Settings", EditorStyles.boldLabel);
 
-			_brushSize = EditorGUILayout.Slider("Brush Size", _brushSize, 1f, 500f);
+			_brushSize = EditorGUILayout.Slider("Brush Size", _brushSize, 1f, GetMaxBrushSize());
 			_brushOpacity = EditorGUILayout.Slider("Strength", _brushOpacity, 0.01f, 1f);
 
 			// CHANGED: Label is now "Falloff"
-			_brushFalloff = EditorGUILayout.Slider("Falloff", _brushFalloff, 0f, 1f);
+			EditorGUILayout.BeginHorizontal();
+			GUILayout.Label("Falloff", GUILayout.Width(EditorGUIUtility.labelWidth));
+			_brushFalloff = GUILayout.HorizontalSlider(_brushFalloff, 0f, 1f);
+			_brushFalloff = Mathf.Clamp(EditorGUILayout.FloatField(_brushFalloff, GUILayout.Width(54)), 0f, 1f);
+			EditorGUILayout.EndHorizontal();
+
+			if (_brushFalloffCurve == null || _brushFalloffCurve.length <= 0)
+			{
+				_brushFalloffCurve = new AnimationCurve(new Keyframe(0f, 1f), new Keyframe(1f, 0f));
+			}
+
+			EditorGUILayout.BeginHorizontal();
+
+			EditorGUILayout.EndHorizontal();
+
+			OnPostBrushSettingsGui();
 
 			EditorGUILayout.Space();
 			GUILayout.EndVertical();
@@ -98,13 +132,20 @@ namespace BetterTerrainTools
 				SceneView.RepaintAll();
 			}
 
-			if (_guiBrushTexture == null)
-				UpdateGuiTexture();
+			if (ShowGuiBrushTexture)
+			{
+				if (_guiBrushTexture == null)
+					UpdateGuiTexture();
 
-			EditorGUILayout.Space();
-			GUILayout.Label(_guiBrushTexture);
+				EditorGUILayout.Space();
+				GUILayout.Label(_guiBrushTexture);
+			}
+
 			GUILayout.EndHorizontal();
-			EditorGUILayout.HelpBox("Alt: Size | Ctrl: Strength | Shift: Falloff", MessageType.Info);
+			if (ShowShortcutHelp)
+			{
+				EditorGUILayout.HelpBox("Shift: Size | Ctrl: Strength | Alt: Falloff", MessageType.Info);
+			}
 		}
 
 		public override void OnInspectorGUI(UnityEngine.Terrain terrain, IOnInspectorGUI editContext) => RenderGui();
@@ -112,6 +153,12 @@ namespace BetterTerrainTools
 		protected virtual void OnSubToolGui()
 		{
 		}
+
+		protected virtual void OnPostBrushSettingsGui()
+		{
+		}
+
+		protected virtual float GetMaxBrushSize() => 500f;
 
 		public override void OnToolSettingsGUI(Terrain terrain, IOnInspectorGUI editContext) => RenderGui();
 
@@ -225,20 +272,20 @@ namespace BetterTerrainTools
 
 			float direction = currentEvent.delta.y > 0 ? -1f : 1f;
 
-			if (currentEvent.alt)
+			if (currentEvent.shift)
 			{
+				direction = currentEvent.delta.x > 0 ? -1f : 1f;
 				// 0.05f = 5% growth per tick. 
 				// At size 10, it adds 0.5. At size 100, it adds 5. At size 500, it adds 25.
-				ModifyBrushParamExponential(ref _brushSize, direction, 0.05f, 1f, 500f);
+				ModifyBrushParamExponential(ref _brushSize, direction, 0.1f, 1f, 500f);
 			}
 			else if (currentEvent.control) // Opacity (Linear)
 			{
-				ModifyBrushParamExponential(ref _brushOpacity, direction, 0.05f, 0.01f, 1f);
+				ModifyBrushParamExponential(ref _brushOpacity, direction, 0.1f, 0.01f, 1f);
 			}
-			else if (currentEvent.shift) // Falloff (Linear)
+			else if (currentEvent.alt) // Falloff (Linear)
 			{
-				direction = currentEvent.delta.x > 0 ? -1f : 1f;
-				ModifyBrushParamExponential(ref _brushFalloff, direction, 0.05f, 0.001f, 1f);
+				ModifyBrushParamExponential(ref _brushFalloff, direction, 0.1f, 0.001f, 1f);
 			}
 
 			SceneView.RepaintAll();
@@ -316,12 +363,25 @@ namespace BetterTerrainTools
 		private void UpdatePreviewTexture() => _previewBrushTexture = CreateBrushTexture2D(false, 128, 0.3f);
 		private void UpdateGuiTexture() => _guiBrushTexture = CreateBrushTexture2D(true, 64);
 
-		// CHANGED: New algorithm using Falloff + Radius + SmoothStep
+		protected Texture2D GetPreviewBrushTexture()
+		{
+			if (_previewBrushTexture == null)
+				UpdatePreviewTexture();
+
+			return _previewBrushTexture;
+		}
+
+		// CHANGED: New algorithm using Falloff + Radius
 		protected float[,] GenerateBrushMask(int size, bool useBrushOpacity)
 		{
 			float[,] samples = new float[size, size];
 			Vector2 center = new Vector2(size * 0.5f, size * 0.5f);
 			float radius = size * 0.5f;
+
+			if (_brushFalloffCurve == null || _brushFalloffCurve.length <= 0)
+			{
+				_brushFalloffCurve = new AnimationCurve(new Keyframe(0f, 1f), new Keyframe(1f, 0f));
+			}
 
 			// Falloff 0 = Inner Radius is 100% (Hard Cylinder)
 			// Falloff 1 = Inner Radius is 0% (Cone/Bell)
@@ -351,9 +411,7 @@ namespace BetterTerrainTools
 						float range = radius - innerRadius;
 						float t = (dist - innerRadius) / range;
 
-						// SmoothStep gives a nice S-curve falloff (Standard for Unreal/Terrain engines)
-						// We flip t (1, 0) because we want 1 at inner and 0 at outer
-						value = Mathf.SmoothStep(1f, 0f, t);
+						value = Mathf.Clamp01(_brushFalloffCurve.Evaluate(t));
 					}
 
 					samples[x, y] = value * (useBrushOpacity ? _brushOpacity : 1);
